@@ -1,0 +1,68 @@
+import fmeobjects
+import urllib.request
+import urllib.parse
+import json
+ 
+log = fmeobjects.FMELogFile()
+ 
+ 
+class FeatureProcessor(object):
+ 
+    def __init__(self):
+        self.geocode_url = "https://geocode.information.qld.gov.au/api/parseLocationAddress"
+ 
+    def input(self, feature):
+        address = feature.getAttribute("Address")
+ 
+        # skip empty addresses
+        if not address or not str(address).strip():
+            feature.setAttribute("x", None)
+            feature.setAttribute("y", None)
+            feature.setAttribute("geocode_status", "NO_ADDRESS")
+            self.pyoutput(feature)
+            return
+ 
+        lon, lat, status = self.geocode(str(address).strip())
+ 
+        feature.setAttribute("x", lon)
+        feature.setAttribute("y", lat)
+        feature.setAttribute("geocode_status", status)
+ 
+        self.pyoutput(feature)
+ 
+    def geocode(self, address):
+        try:
+            params = urllib.parse.urlencode({"address": address})
+            url = f"{self.geocode_url}?{params}"
+ 
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+ 
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode("utf-8"))
+ 
+            # API returns a list of matches
+            if not isinstance(data, list) or not data:
+                return None, None, "NO_RESULT"
+ 
+            record = data[0]
+ 
+            if record.get("isError"):
+                return None, None, "API_ERROR"
+ 
+            lon = record.get("longitude")
+            lat = record.get("latitude")
+ 
+            if lon is None or lat is None:
+                return None, None, "NO_COORDINATES"
+ 
+            log.logMessageString(f"Geocode result: {lon}, {lat}", fmeobjects.FME_INFORM)
+ 
+            return float(lon), float(lat), "OK"
+ 
+        except Exception as e:
+            log.logMessageString(f"Geocode error: {e}", fmeobjects.FME_ERROR)
+            return None, None, "ERROR"
+ 
+    def close(self):
+        pass
+
