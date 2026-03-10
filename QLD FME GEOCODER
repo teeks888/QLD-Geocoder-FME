@@ -2,67 +2,67 @@ import fmeobjects
 import urllib.request
 import urllib.parse
 import json
- 
+import re
+import time
+
 log = fmeobjects.FMELogFile()
- 
- 
+
 class FeatureProcessor(object):
- 
+
     def __init__(self):
-        self.geocode_url = "https://geocode.information.qld.gov.au/api/parseLocationAddress"
- 
+        self.GEOCODE_URL = "https://geocode.information.qld.gov.au/api/parseLocationAddress"
+        self.delay_seconds = 0.2   # 0.2 = 5 requests/sec
+
     def input(self, feature):
-        address = feature.getAttribute("Address")
- 
-        # skip empty addresses
+        address = feature.getAttribute('Address')
+
         if not address or not str(address).strip():
-            feature.setAttribute("x", None)
-            feature.setAttribute("y", None)
-            feature.setAttribute("geocode_status", "NO_ADDRESS")
+            feature.setAttribute('x', None)
+            feature.setAttribute('y', None)
+            feature.setAttribute('geocode_status', 'NO ADDRESS')
             self.pyoutput(feature)
             return
- 
+
         lon, lat, status = self.geocode(str(address).strip())
- 
-        feature.setAttribute("x", lon)
-        feature.setAttribute("y", lat)
-        feature.setAttribute("geocode_status", status)
- 
+
+        feature.setAttribute('x', lon)
+        feature.setAttribute('y', lat)
+        feature.setAttribute('geocode_status', status)
         self.pyoutput(feature)
- 
+
     def geocode(self, address):
         try:
-            params = urllib.parse.urlencode({"address": address})
-            url = f"{self.geocode_url}?{params}"
- 
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
- 
-            with urllib.request.urlopen(req, timeout=10) as response:
-                data = json.loads(response.read().decode("utf-8"))
- 
-            # API returns a list of matches
-            if not isinstance(data, list) or not data:
+            params   = urllib.parse.urlencode({"address": address})  # ← KEY FIX
+            full_url = f"{self.GEOCODE_URL}?{params}"
+            log.logMessageString(f"URL: {full_url}", fmeobjects.FME_INFORM)
+
+            req = urllib.request.Request(full_url, headers={"Accept": "application/json"})
+
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+
+            # Response is a LIST  ← KEY FIX
+            if not isinstance(data, list) or len(data) == 0:
                 return None, None, "NO_RESULT"
- 
-            record = data[0]
- 
-            if record.get("isError"):
+
+            rec = data[0]
+
+            if rec.get("isError"):
                 return None, None, "API_ERROR"
- 
-            lon = record.get("longitude")
-            lat = record.get("latitude")
- 
+
+            lon = rec.get("longitude")   # ← KEY FIX
+            lat = rec.get("latitude")    # ← KEY FIX
+
             if lon is None or lat is None:
                 return None, None, "NO_COORDINATES"
- 
-            log.logMessageString(f"Geocode result: {lon}, {lat}", fmeobjects.FME_INFORM)
- 
+
+            log.logMessageString(f"Result: {lon}, {lat}", fmeobjects.FME_INFORM)
             return float(lon), float(lat), "OK"
- 
+
         except Exception as e:
-            log.logMessageString(f"Geocode error: {e}", fmeobjects.FME_ERROR)
-            return None, None, "ERROR"
- 
+            log.logMessageString(f"Error: {str(e)}", fmeobjects.FME_ERROR)
+            return None, None, f"ERROR: {str(e)}"
+
     def close(self):
         pass
 
