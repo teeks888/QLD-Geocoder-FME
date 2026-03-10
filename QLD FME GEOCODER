@@ -32,7 +32,7 @@ class FeatureProcessor(object):
 
     def geocode(self, address):
         try:
-            params   = urllib.parse.urlencode({"address": address})  # ← KEY FIX
+            params   = urllib.parse.urlencode({"address": address})  
             full_url = f"{self.GEOCODE_URL}?{params}"
             log.logMessageString(f"URL: {full_url}", fmeobjects.FME_INFORM)
 
@@ -41,7 +41,7 @@ class FeatureProcessor(object):
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
 
-            # Response is a LIST  ← KEY FIX
+            # Response is a LIST  
             if not isinstance(data, list) or len(data) == 0:
                 return None, None, "NO_RESULT"
 
@@ -50,8 +50,8 @@ class FeatureProcessor(object):
             if rec.get("isError"):
                 return None, None, "API_ERROR"
 
-            lon = rec.get("longitude")   # ← KEY FIX
-            lat = rec.get("latitude")    # ← KEY FIX
+            lon = rec.get("longitude")   
+            lat = rec.get("latitude")    
 
             if lon is None or lat is None:
                 return None, None, "NO_COORDINATES"
